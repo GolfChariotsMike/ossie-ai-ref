@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ossie AI Ref — Test Player</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0f172a; color: #f1f5f9; font-family: system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; }
+
+header { background: #1e293b; padding: 12px 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #334155; flex-shrink: 0; }
+header h1 { font-size: 1.1rem; color: #f97316; }
+.score-display { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.team-score { background: #0f172a; border-radius: 8px; padding: 6px 16px; text-align: center; min-width: 80px; }
+.team-score .label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+.team-score .score { font-size: 1.8rem; font-weight: 700; color: #f1f5f9; line-height: 1; }
+.vs { color: #475569; font-size: 0.9rem; }
+
+.main { display: flex; flex: 1; overflow: hidden; }
+
+.video-wrap { position: relative; flex: 1; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+#video { display: none; }
+#canvas { max-width: 100%; max-height: 100%; cursor: crosshair; }
+.no-video { color: #475569; text-align: center; }
+.no-video h2 { font-size: 1.2rem; margin-bottom: 8px; }
+.no-video p { font-size: 0.85rem; }
+
+.sidebar { width: 300px; background: #1e293b; border-left: 1px solid #334155; display: flex; flex-direction: column; flex-shrink: 0; }
+.sidebar-section { padding: 12px; border-bottom: 1px solid #334155; }
+.sidebar-section h3 { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+
+.upload-area { display: flex; flex-direction: column; gap: 8px; }
+.file-btn { background: #334155; border: none; color: #f1f5f9; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; text-align: left; display: flex; justify-content: space-between; align-items: center; }
+.file-btn:hover { background: #475569; }
+.file-btn .status { font-size: 0.7rem; color: #22c55e; }
+.file-btn .status.none { color: #64748b; }
+
+.mode-btns { display: flex; gap: 6px; }
+.mode-btn { flex: 1; padding: 7px; border-radius: 6px; border: 1px solid #334155; background: transparent; color: #94a3b8; cursor: pointer; font-size: 0.75rem; transition: all 0.15s; }
+.mode-btn.active { background: #f97316; border-color: #f97316; color: white; }
+
+.cal-steps { font-size: 0.75rem; color: #94a3b8; }
+.cal-step { padding: 4px 0; display: flex; align-items: center; gap-6px; }
+.cal-step.done { color: #22c55e; }
+.cal-step.active { color: #f97316; font-weight: 600; }
+
+.controls { display: flex; align-items: center; gap-8px; padding: 8px; }
+.ctrl-btn { background: #334155; border: none; color: #f1f5f9; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.ctrl-btn:hover { background: #475569; }
+.ctrl-btn.primary { background: #f97316; }
+.ctrl-btn.primary:hover { background: #ea6c0a; }
+input[type=range] { flex: 1; accent-color: #f97316; }
+.time-display { font-size: 0.75rem; color: #64748b; min-width: 50px; text-align: right; }
+
+.event-log { flex: 1; overflow-y: auto; }
+.event-item { padding: 8px 12px; border-bottom: 1px solid #1e293b; font-size: 0.75rem; display: flex; gap: 8px; align-items: flex-start; }
+.event-item .icon { flex-shrink: 0; font-size: 1rem; }
+.event-item .text { flex: 1; }
+.event-item .text .desc { color: #f1f5f9; }
+.event-item .text .frame { color: #475569; font-size: 0.7rem; margin-top: 2px; }
+.event-item.point { background: rgba(34,197,94,0.08); }
+.event-item.fault { background: rgba(239,68,68,0.08); }
+.event-item.rally { background: rgba(249,115,22,0.05); }
+
+.point-flash { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); background: rgba(34,197,94,0.9); color: white; padding: 16px 32px; border-radius: 12px; font-size: 1.6rem; font-weight: 700; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 10; text-align: center; }
+.point-flash.show { opacity: 1; }
+
+.legend { display: flex; flex-direction: column; gap: 4px; }
+.legend-row { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; color: #94a3b8; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.legend-line { width: 20px; height: 2px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏐 Ossie AI Ref — Test Player</h1>
+  <div class="score-display">
+    <div class="team-score">
+      <div class="label">Team A</div>
+      <div class="score" id="score-a">0</div>
+    </div>
+    <div class="vs">VS</div>
+    <div class="team-score">
+      <div class="label">Team B</div>
+      <div class="score" id="score-b">0</div>
+    </div>
+  </div>
+</header>
+
+<div class="main">
+  <div class="video-wrap" id="video-wrap">
+    <div class="no-video" id="no-video">
+      <h2>Load a video to begin</h2>
+      <p>Upload your clip and ball tracking CSV →</p>
+    </div>
+    <video id="video" playsinline></video>
+    <canvas id="canvas"></canvas>
+    <div class="point-flash" id="point-flash"></div>
+  </div>
+
+  <div class="sidebar">
+    <!-- Files -->
+    <div class="sidebar-section">
+      <h3>Files</h3>
+      <div class="upload-area">
+        <button class="file-btn" onclick="document.getElementById('inp-video').click()">
+          📹 Video clip
+          <span class="status none" id="lbl-video">not loaded</span>
+        </button>
+        <input type="file" id="inp-video" accept="video/*" hidden>
+
+        <button class="file-btn" onclick="document.getElementById('inp-csv').click()">
+          📊 Ball tracking CSV
+          <span class="status none" id="lbl-csv">not loaded</span>
+        </button>
+        <input type="file" id="inp-csv" accept=".csv" hidden>
+      </div>
+    </div>
+
+    <!-- Mode -->
+    <div class="sidebar-section">
+      <h3>Mode</h3>
+      <div class="mode-btns">
+        <button class="mode-btn active" id="mode-play" onclick="setMode('play')">▶ Playback</button>
+        <button class="mode-btn" id="mode-cal" onclick="setMode('calibrate')">⊹ Calibrate</button>
+      </div>
+      <div id="cal-ui" style="display:none;margin-top:10px;">
+        <div class="cal-steps" id="cal-steps"></div>
+        <button class="file-btn" style="margin-top:8px;" onclick="undoCal()">↩ Undo</button>
+        <button class="file-btn" style="margin-top:4px;" onclick="resetCal()">✕ Reset</button>
+        <button class="file-btn" style="margin-top:4px;color:#22c55e;" onclick="exportCal()">💾 Export JSON</button>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="sidebar-section">
+      <h3>Playback</h3>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <button class="ctrl-btn primary" id="btn-play" onclick="togglePlay()">▶</button>
+        <input type="range" id="scrubber" value="0" min="0" max="1000" step="1" oninput="scrub(this.value)">
+        <span class="time-display" id="time-display">0:00</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:0.75rem;color:#64748b;">Speed:</span>
+        <button class="file-btn" style="flex:1;justify-content:center;" onclick="setSpeed(0.25)">0.25×</button>
+        <button class="file-btn" style="flex:1;justify-content:center;" onclick="setSpeed(0.5)">0.5×</button>
+        <button class="file-btn" style="flex:1;justify-content:center;" onclick="setSpeed(1)">1×</button>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="sidebar-section">
+      <h3>Legend</h3>
+      <div class="legend">
+        <div class="legend-row"><div class="legend-dot" style="background:#ef4444;border:2px solid white"></div> Ball detected</div>
+        <div class="legend-row"><div class="legend-dot" style="background:#f97316;opacity:0.5"></div> Ball trail</div>
+        <div class="legend-row"><div class="legend-line" style="background:#ef4444;"></div> Top net (out boundary)</div>
+        <div class="legend-row"><div class="legend-line" style="background:#f97316;"></div> Centre net</div>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="sidebar-section" style="flex-shrink:0;">
+      <h3>Events <span style="color:#475569;font-weight:normal;" id="event-count">(0)</span></h3>
+    </div>
+    <div class="event-log" id="event-log"></div>
+  </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let detections = {};   // frame → {x, y, r}
+let fps = 30;
+let mode = 'play';
+let calPoints = [];
+let calStep = 0;
+const CAL_STEPS = [
+  { label: 'Top Net — Left post', color: '#ef4444', group: 'top' },
+  { label: 'Top Net — Right post', color: '#ef4444', group: 'top' },
+  { label: 'Centre Net — Left post', color: '#f97316', group: 'centre' },
+  { label: 'Centre Net — Right post', color: '#f97316', group: 'centre' },
+];
+let netLines = null;   // { top: [{x,y},{x,y}], centre: [{x,y},{x,y}] }
+let scoreA = 0, scoreB = 0;
+let events = [];
+let trail = [];
+let lastFrameForEngine = -1;
+let flashTimeout = null;
+
+// Game engine state
+let rallyActive = false;
+let rallyStartFrame = 0;
+let lastVisibleFrame = -1;
+let invisStreak = 0;
+const DEAD_BALL_FRAMES = 20;
+const STILL_VEL = 10;
+
+// ─── Elements ────────────────────────────────────────────────────────────────
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const noVideo = document.getElementById('no-video');
+const scrubber = document.getElementById('scrubber');
+const timeDisplay = document.getElementById('time-display');
+const btnPlay = document.getElementById('btn-play');
+const eventLog = document.getElementById('event-log');
+const eventCount = document.getElementById('event-count');
+const pointFlash = document.getElementById('point-flash');
+
+// ─── File loading ────────────────────────────────────────────────────────────
+document.getElementById('inp-video').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  video.src = URL.createObjectURL(f);
+  video.load();
+  document.getElementById('lbl-video').textContent = f.name.slice(0, 18);
+  document.getElementById('lbl-video').className = 'status';
+  noVideo.style.display = 'none';
+  canvas.style.display = 'block';
+  video.addEventListener('loadedmetadata', () => {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    scrubber.max = Math.floor(video.duration * 1000);
+    // Estimate FPS from known common values
+    fps = 60; // default to 60 for Ossie footage
+    drawFrame();
+  }, { once: true });
+});
+
+document.getElementById('inp-csv').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    detections = {};
+    const lines = ev.target.result.split('\n');
+    lines.slice(1).forEach(line => {
+      const parts = line.split(',');
+      if (parts.length < 4) return;
+      const frame = parseInt(parts[0]);
+      const vis = parseInt(parts[1]);
+      if (vis === 1) {
+        detections[frame] = { x: parseFloat(parts[2]), y: parseFloat(parts[3]), r: parseFloat(parts[4]) || 8 };
+      }
+    });
+    document.getElementById('lbl-csv').textContent = `${Object.keys(detections).length} detections`;
+    document.getElementById('lbl-csv').className = 'status';
+    resetGame();
+    drawFrame();
+  };
+  reader.readAsText(f);
+});
+
+// ─── Playback ────────────────────────────────────────────────────────────────
+function togglePlay() {
+  if (video.paused) { video.play(); btnPlay.textContent = '⏸'; }
+  else { video.pause(); btnPlay.textContent = '▶'; }
+}
+
+function setSpeed(s) { video.playbackRate = s; }
+
+function scrub(val) {
+  video.currentTime = val / 1000;
+  resetGame();
+  drawFrame();
+}
+
+function fmtTime(t) {
+  const m = Math.floor(t / 60);
+  const s = Math.floor(t % 60);
+  return `${m}:${s.toString().padStart(2,'0')}`;
+}
+
+video.addEventListener('timeupdate', () => {
+  scrubber.value = Math.floor(video.currentTime * 1000);
+  timeDisplay.textContent = fmtTime(video.currentTime);
+  drawFrame();
+});
+
+video.addEventListener('ended', () => { btnPlay.textContent = '▶'; });
+
+// ─── Drawing ─────────────────────────────────────────────────────────────────
+function drawFrame() {
+  if (!canvas.width) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const frame = Math.floor(video.currentTime * fps);
+
+  // Draw net lines
+  drawNets();
+
+  // Draw ball
+  if (detections[frame]) {
+    const { x, y, r } = detections[frame];
+    trail.push({ x, y, r });
+    if (trail.length > 25) trail.shift();
+    invisStreak = 0;
+    lastVisibleFrame = frame;
+
+    // Trail
+    trail.forEach((p, i) => {
+      const alpha = (i + 1) / trail.length;
+      const radius = Math.max(3, (p.r || 8) * 0.5 * alpha);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(249,115,22,${alpha * 0.7})`;
+      ctx.fill();
+    });
+
+    // Ball
+    ctx.beginPath();
+    ctx.arc(x, y, Math.max(r || 8, 10), 0, Math.PI * 2);
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'white';
+    ctx.fill();
+
+    // Run game engine for this frame (only forward)
+    if (frame > lastFrameForEngine) {
+      runEngine(frame, x, y, r);
+      lastFrameForEngine = frame;
+    }
+  } else {
+    invisStreak++;
+    if (trail.length) trail.shift();
+    if (invisStreak >= DEAD_BALL_FRAMES && rallyActive) {
+      rallyActive = false;
+      addEvent(frame, 'dead', '⚫ Dead ball — ball lost', 'rally');
+    }
+  }
+
+  // HUD
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(10, 10, 160, 32);
+  ctx.fillStyle = '#f1f5f9';
+  ctx.font = 'bold 14px system-ui';
+  ctx.fillText(`Frame ${frame}  |  ${detections[frame] ? '🟢 DETECTED' : '⚫ searching'}`, 18, 31);
+}
+
+// ─── Net drawing ─────────────────────────────────────────────────────────────
+function drawNets() {
+  if (!netLines) return;
+  const defs = [
+    { key: 'top', color: '#ef4444', label: 'TOP NET' },
+    { key: 'centre', color: '#f97316', label: 'CENTRE NET' },
+  ];
+  defs.forEach(({ key, color, label }) => {
+    const pts = netLines[key];
+    if (!pts || pts.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    ctx.lineTo(pts[1].x, pts[1].y);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Label
+    ctx.fillStyle = color;
+    ctx.font = 'bold 11px system-ui';
+    ctx.fillText(label, pts[0].x + 6, pts[0].y - 6);
+    // Dots
+    pts.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    });
+  });
+}
+
+// ─── Game Engine ─────────────────────────────────────────────────────────────
+let prevBall = null;
+
+function velocity(a, b) {
+  return Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+}
+
+function interpolateY(x, p1, p2) {
+  if (p2.x === p1.x) return (p1.y + p2.y) / 2;
+  return p1.y + (p2.y - p1.y) * (x - p1.x) / (p2.x - p1.x);
+}
+
+function isAboveTopNet(x, y) {
+  if (!netLines?.top?.length === 2) return false;
+  const [l, r] = netLines.top;
+  const netY = interpolateY(x, l, r);
+  return y < netY;
+}
+
+function ballSide(x) {
+  if (!netLines?.centre?.length === 2) return 'A';
+  const midX = (netLines.centre[0].x + netLines.centre[1].x) / 2;
+  return x < midX ? 'A' : 'B';
+}
+
+function resetGame() {
+  scoreA = 0; scoreB = 0;
+  events = []; trail = [];
+  rallyActive = false; lastFrameForEngine = -1;
+  prevBall = null; invisStreak = 0;
+  document.getElementById('score-a').textContent = '0';
+  document.getElementById('score-b').textContent = '0';
+  eventLog.innerHTML = '';
+  eventCount.textContent = '(0)';
+}
+
+function runEngine(frame, x, y, r) {
+  const curr = { x, y, r };
+
+  // Check out of bounds (above top net)
+  if (netLines?.top && isAboveTopNet(x, y) && rallyActive) {
+    const losingSide = ballSide(x);
+    const winningSide = losingSide === 'A' ? 'B' : 'A';
+    if (winningSide === 'A') scoreA++; else scoreB++;
+    updateScore();
+    addEvent(frame, 'point', `🏆 OUT — over top net (side ${losingSide}) → Point Team ${winningSide}`, 'point');
+    flashPoint(`POINT\nTeam ${winningSide}`);
+    rallyActive = false;
+  }
+
+  // Rally start
+  if (!rallyActive && prevBall) {
+    const vel = velocity(prevBall, curr);
+    if (vel > STILL_VEL * 2) {
+      rallyActive = true;
+      rallyStartFrame = frame;
+      addEvent(frame, 'rally_start', '🏐 Rally started', 'rally');
+    }
+  }
+
+  prevBall = curr;
+}
+
+function updateScore() {
+  document.getElementById('score-a').textContent = scoreA;
+  document.getElementById('score-b').textContent = scoreB;
+}
+
+function flashPoint(msg) {
+  pointFlash.textContent = msg;
+  pointFlash.classList.add('show');
+  clearTimeout(flashTimeout);
+  flashTimeout = setTimeout(() => pointFlash.classList.remove('show'), 1800);
+}
+
+function addEvent(frame, type, desc, cls) {
+  events.push({ frame, type, desc });
+  const div = document.createElement('div');
+  div.className = `event-item ${cls || ''}`;
+  const icon = type === 'point' ? '🏆' : type === 'rally_start' ? '🏐' : type === 'dead' ? '⚫' : '•';
+  div.innerHTML = `<span class="icon">${icon}</span><div class="text"><div class="desc">${desc}</div><div class="frame">Frame ${frame}</div></div>`;
+  eventLog.prepend(div);
+  eventCount.textContent = `(${events.length})`;
+}
+
+// ─── Calibration mode ────────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('mode-play').classList.toggle('active', m === 'play');
+  document.getElementById('mode-cal').classList.toggle('active', m === 'calibrate');
+  document.getElementById('cal-ui').style.display = m === 'calibrate' ? 'block' : 'none';
+  if (m === 'calibrate') { video.pause(); btnPlay.textContent = '▶'; updateCalSteps(); }
+  canvas.style.cursor = m === 'calibrate' ? 'crosshair' : 'default';
+}
+
+function updateCalSteps() {
+  const div = document.getElementById('cal-steps');
+  div.innerHTML = CAL_STEPS.map((s, i) => {
+    const done = calPoints[i];
+    const active = i === calStep;
+    return `<div class="cal-step ${done ? 'done' : active ? 'active' : ''}">
+      ${done ? '✓' : active ? '→' : '○'} ${i + 1}. ${s.label}
+      ${done ? `<span style="color:#475569"> (${done.x},${done.y})</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+canvas.addEventListener('click', e => {
+  if (mode !== 'calibrate') return;
+  if (calStep >= CAL_STEPS.length) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = Math.round((e.clientX - rect.left) * scaleX);
+  const y = Math.round((e.clientY - rect.top) * scaleY);
+  calPoints[calStep] = { x, y };
+  calStep++;
+  if (calStep >= CAL_STEPS.length) {
+    netLines = {
+      top: [calPoints[0], calPoints[1]],
+      centre: [calPoints[2], calPoints[3]],
+    };
+    resetGame();
+  }
+  updateCalSteps();
+  drawFrame();
+});
+
+function undoCal() {
+  if (calStep === 0) return;
+  calStep--;
+  calPoints[calStep] = null;
+  if (calStep < CAL_STEPS.length) netLines = null;
+  updateCalSteps();
+  drawFrame();
+}
+
+function resetCal() {
+  calPoints = []; calStep = 0; netLines = null;
+  updateCalSteps(); drawFrame();
+}
+
+function exportCal() {
+  if (!netLines) return alert('Set all 4 points first');
+  const cal = {
+    image_width: canvas.width,
+    image_height: canvas.height,
+    top_net: { left: calPoints[0], right: calPoints[1] },
+    centre_net: { left: calPoints[2], right: calPoints[3] },
+    calibrated_at: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(cal, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'court_calibration.json';
+  a.click();
+}
+
+// Init
+canvas.style.display = 'none';
+</script>
+</body>
+</html>

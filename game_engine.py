@@ -53,15 +53,18 @@ class CalibrationData:
 def load_calibration(path: str) -> CalibrationData:
     with open(path) as f:
         d = json.load(f)
+    h = d['image_height']
+    w = d['image_width']
     return CalibrationData(
-        image_width=d['image_width'],
-        image_height=d['image_height'],
+        image_width=w,
+        image_height=h,
         top_net_left=(d['top_net']['left']['x'], d['top_net']['left']['y']),
         top_net_right=(d['top_net']['right']['x'], d['top_net']['right']['y']),
         centre_net_left=(d['centre_net']['left']['x'], d['centre_net']['left']['y']),
         centre_net_right=(d['centre_net']['right']['x'], d['centre_net']['right']['y']),
-        sand_floor_left=(d['sand_floor']['left']['x'], d['sand_floor']['left']['y']),
-        sand_floor_right=(d['sand_floor']['right']['x'], d['sand_floor']['right']['y']),
+        # Sand floor defaults to bottom of frame if not provided
+        sand_floor_left=(d['sand_floor']['left']['x'], d['sand_floor']['left']['y']) if 'sand_floor' in d else (0, h),
+        sand_floor_right=(d['sand_floor']['right']['x'], d['sand_floor']['right']['y']) if 'sand_floor' in d else (w, h),
     )
 
 

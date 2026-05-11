@@ -1,0 +1,13 @@
+{
+  "image_width": 1920,
+  "image_height": 1080,
+  "top_net": {
+    "left": { "x": 17, "y": 101 },
+    "right": { "x": 1895, "y": 99 }
+  },
+  "centre_net": {
+    "left": { "x": 8, "y": 827 },
+    "right": { "x": 114, "y": 1073 }
+  },
+  "calibrated_at": "2026-05-11T12:29:34.297Z"
+}
