@@ -11,18 +11,29 @@ Human supervisor with tablet can review and overrule any call.
 
 ---
 
-## Hardware (per court)
-- 2x PoE IP cameras — 1080p 60fps, wide angle
-  - Camera 1: elevated sideline (primary tracking)
-  - Camera 2: above back net (net touch + player reach-over)
+## Hardware (per court) — 4-Camera Architecture
+- 4x PoE IP cameras — 1080p 60fps, wide angle
+  - Camera 1: Left sideline elevated — primary ball tracking, full court width
+  - Camera 2: Right sideline elevated — redundant tracking, opposite angle
+  - Camera 3: Left end above back net — ball landing, player reach-over
+  - Camera 4: Right end above back net — same, opposite side
 - 1x NVIDIA Jetson Orin Nano (~$250) — edge compute, self-contained per court
 - 1x LED scoreboard display
 - 1x buzzer/speaker (point/fault audio feedback)
-- PoE switch port + cabling
+- PoE switch + cabling
 - Calibration markers on net posts (coloured tape/reflective dots)
 
-**Cost estimate:** ~$600-860/court, ~$5.2K-7.3K for 8 courts
-**ROI:** ~3-4 months vs paying human refs
+**Why 4 cameras:**
+- 3D ball triangulation — two cameras from different angles = real-world XYZ, eliminates perspective distortion entirely
+- No blind spots — ball always visible from at least 2 angles
+- Full player body tracking — 4 angles = accurate pose reconstruction, net touches trivially detected
+- Review from any angle — tablet shows best angle for disputed calls
+
+**Cost estimate:** ~$1,200-1,600/court, ~$10K-13K for 8 courts
+**Current ref cost:** ~$200,000/year
+**ROI:** Full system paid off in 3-4 weeks of operation
+**Year 2+ savings:** ~$180K-190K/year (net of maintenance)
+**Licensing potential:** Other venues, sports (netball, basketball) — significant IP value
 
 ---
 
@@ -69,11 +80,13 @@ WAITING → SERVING → IN_PLAY → DEAD_BALL → POINT_AWARDED → WAITING
 - **Current approach:** 2-point line calibration (click net corners in frame)
   - Works well for side-on camera angles
   - Ball crossing the 2D line in image = crossing boundary in real world
-- **⚠️ ROADMAP: Homography calibration (add before production)**
-  - Problem: perspective distortion — ball at back of court appears lower in image than same-height ball at front
-  - Fix: mark 4 known real-world points at calibration time → OpenCV `findHomography()` → maps image coords to real-world coords → all boundary checks done in real-world space
-  - One-time calibration per camera position
-  - Critical for accuracy from elevated/angled cameras
+- **⚠️ ROADMAP: 3D triangulation (replaces homography for 4-camera setup)**
+  - With 2+ cameras: use stereo vision / multi-view geometry to reconstruct real-world XYZ of ball
+  - OpenCV `triangulatePoints()` — given ball position in 2 camera frames + camera calibration matrices → real 3D position
+  - All boundary checks done in real-world space (metres, not pixels) — no perspective distortion at all
+  - One-time calibration per court: film a checkerboard pattern to get camera intrinsics + extrinsics
+  - Far more accurate and robust than homography
+  - Critical for production-grade accuracy
 
 ---
 
