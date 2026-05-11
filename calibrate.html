@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ossie AI Ref — Court Calibration</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f172a; color: #f1f5f9; font-family: system-ui, sans-serif; padding: 20px; }
+  h1 { font-size: 1.4rem; color: #f97316; margin-bottom: 4px; }
+  p.sub { font-size: 0.85rem; color: #94a3b8; margin-bottom: 16px; }
+  .layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+  .canvas-wrap { position: relative; flex-shrink: 0; }
+  canvas { display: block; cursor: crosshair; border: 2px solid #334155; border-radius: 8px; }
+  .panel { width: 260px; }
+  .step { background: #1e293b; border-radius: 8px; padding: 14px; margin-bottom: 12px; border-left: 3px solid #334155; transition: border-color 0.2s; }
+  .step.active { border-color: #f97316; }
+  .step.done { border-color: #22c55e; }
+  .step h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+  .step p { font-size: 0.78rem; color: #94a3b8; }
+  .step .coords { font-size: 0.75rem; color: #22c55e; margin-top: 6px; font-family: monospace; }
+  .btn { display: block; width: 100%; padding: 10px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 600; margin-top: 8px; transition: opacity 0.2s; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-secondary { background: #334155; color: #f1f5f9; }
+  .btn-success { background: #22c55e; color: white; }
+  .legend { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  pre { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 12px; font-size: 0.72rem; color: #7dd3fc; overflow-x: auto; margin-top: 8px; white-space: pre-wrap; display: none; }
+</style>
+</head>
+<body>
+<h1>🏐 Ossie AI Ref — Court Calibration</h1>
+<p class="sub">Click 4 points to define the virtual net boundaries. Just 2 minutes.</p>
+
+<div class="layout">
+  <div class="canvas-wrap">
+    <canvas id="canvas"></canvas>
+  </div>
+  <div class="panel">
+    <div class="step" id="step-0">
+      <h3>1. Top Net — Left</h3>
+      <p>Click the top-left corner/post of the top boundary net</p>
+      <div class="coords" id="coords-0"></div>
+    </div>
+    <div class="step" id="step-1">
+      <h3>2. Top Net — Right</h3>
+      <p>Click the top-right corner/post of the top boundary net</p>
+      <div class="coords" id="coords-1"></div>
+    </div>
+    <div class="step" id="step-2">
+      <h3>3. Centre Net — Left</h3>
+      <p>Click the top-left of the centre (dividing) net</p>
+      <div class="coords" id="coords-2"></div>
+    </div>
+    <div class="step" id="step-3">
+      <h3>4. Centre Net — Right</h3>
+      <p>Click the top-right of the centre net</p>
+      <div class="coords" id="coords-3"></div>
+    </div>
+
+    <button class="btn btn-secondary" onclick="undoLast()">↩ Undo Last Point</button>
+    <button class="btn btn-secondary" onclick="resetAll()">Reset All</button>
+    <button class="btn btn-success" id="btn-save" disabled onclick="saveCalibration()">💾 Save Calibration JSON</button>
+
+    <div class="legend">
+      <div class="legend-item"><div class="dot" style="background:#ef4444"></div> Top net — ball over = out</div>
+      <div class="legend-item"><div class="dot" style="background:#f97316"></div> Centre net — crossing = play</div>
+    </div>
+
+    <pre id="json-output"></pre>
+  </div>
+</div>
+
+<script>
+const STEPS = [
+  { label: 'Top Net L', color: '#ef4444', group: 'top_net' },
+  { label: 'Top Net R', color: '#ef4444', group: 'top_net' },
+  { label: 'Centre Net L', color: '#f97316', group: 'centre_net' },
+  { label: 'Centre Net R', color: '#f97316', group: 'centre_net' },
+];
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const img = new Image();
+let scale = 1;
+let points = [];
+let currentStep = 0;
+
+img.onload = function() {
+  const maxW = Math.min(window.innerWidth - 320, 1280);
+  scale = maxW / img.naturalWidth;
+  canvas.width = img.naturalWidth * scale;
+  canvas.height = img.naturalHeight * scale;
+  redraw();
+  document.getElementById('step-0').classList.add('active');
+};
+img.src = 'calibration_frame.jpg';
+
+canvas.addEventListener('click', function(e) {
+  if (currentStep >= STEPS.length) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.round((e.clientX - rect.left) / scale);
+  const y = Math.round((e.clientY - rect.top) / scale);
+  points.push({ x, y, step: currentStep });
+  document.getElementById(`coords-${currentStep}`).textContent = `x: ${x}, y: ${y}`;
+  document.getElementById(`step-${currentStep}`).classList.remove('active');
+  document.getElementById(`step-${currentStep}`).classList.add('done');
+  currentStep++;
+  if (currentStep < STEPS.length) {
+    document.getElementById(`step-${currentStep}`).classList.add('active');
+  } else {
+    document.getElementById('btn-save').disabled = false;
+  }
+  redraw();
+});
+
+function redraw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const pairs = [[0,1],[2,3]];
+  const colors = ['#ef4444','#f97316'];
+  pairs.forEach(([a,b],i) => {
+    const pa = points.find(p => p.step === a);
+    const pb = points.find(p => p.step === b);
+    if (pa && pb) {
+      ctx.beginPath();
+      ctx.moveTo(pa.x*scale, pa.y*scale);
+      ctx.lineTo(pb.x*scale, pb.y*scale);
+      ctx.strokeStyle = colors[i];
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([6,3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  });
+
+  points.forEach(p => {
+    const color = STEPS[p.step].color;
+    ctx.beginPath();
+    ctx.arc(p.x*scale, p.y*scale, 7, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 11px system-ui';
+    ctx.fillText(STEPS[p.step].label, p.x*scale+10, p.y*scale+4);
+  });
+
+  if (currentStep < STEPS.length) {
+    ctx.fillStyle = '#f97316';
+    ctx.font = '13px system-ui';
+    ctx.fillText(`Click: ${STEPS[currentStep].label}`, 10, 24);
+  } else {
+    ctx.fillStyle = '#22c55e';
+    ctx.font = 'bold 13px system-ui';
+    ctx.fillText('✓ All points set — hit Save!', 10, 24);
+  }
+}
+
+function undoLast() {
+  if (points.length === 0) return;
+  const last = points.pop();
+  const s = last.step;
+  document.getElementById(`coords-${s}`).textContent = '';
+  document.getElementById(`step-${s}`).classList.remove('done','active');
+  currentStep = s;
+  document.getElementById(`step-${s}`).classList.add('active');
+  document.getElementById('btn-save').disabled = true;
+  redraw();
+}
+
+function resetAll() {
+  points = []; currentStep = 0;
+  for (let i = 0; i < STEPS.length; i++) {
+    document.getElementById(`coords-${i}`).textContent = '';
+    document.getElementById(`step-${i}`).classList.remove('done','active');
+  }
+  document.getElementById('step-0').classList.add('active');
+  document.getElementById('btn-save').disabled = true;
+  document.getElementById('json-output').style.display = 'none';
+  redraw();
+}
+
+function saveCalibration() {
+  const cal = {
+    image_width: img.naturalWidth,
+    image_height: img.naturalHeight,
+    top_net: {
+      left:  { x: points[0].x, y: points[0].y },
+      right: { x: points[1].x, y: points[1].y }
+    },
+    centre_net: {
+      left:  { x: points[2].x, y: points[2].y },
+      right: { x: points[3].x, y: points[3].y }
+    },
+    calibrated_at: new Date().toISOString()
+  };
+  const json = JSON.stringify(cal, null, 2);
+  document.getElementById('json-output').textContent = json;
+  document.getElementById('json-output').style.display = 'block';
+  const blob = new Blob([json], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'court_calibration.json';
+  a.click();
+}
+</script>
+</body>
+</html>
