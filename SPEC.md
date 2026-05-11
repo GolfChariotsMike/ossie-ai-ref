@@ -11,29 +11,64 @@ Human supervisor with tablet can review and overrule any call.
 
 ---
 
-## Hardware (per court) — 4-Camera Architecture
-- 4x PoE IP cameras — 1080p 60fps, wide angle
-  - Camera 1: Left sideline elevated — primary ball tracking, full court width
-  - Camera 2: Right sideline elevated — redundant tracking, opposite angle
-  - Camera 3: Left end above back net — ball landing, player reach-over
-  - Camera 4: Right end above back net — same, opposite side
-- 1x NVIDIA Jetson Orin Nano (~$250) — edge compute, self-contained per court
-- 1x LED scoreboard display
-- 1x buzzer/speaker (point/fault audio feedback)
-- PoE switch + cabling
+## Hardware (per court)
+
+### Camera Layout — 4 cameras, all on umpire stand
+The umpire stand sits at the centre net, already elevated above net height. All 4 cameras mount as a compact cluster on the stand — one cable bundle down the pole to the Jetson at the base.
+
+```
+        BACK NET (Side A)
+              ↑
+    [Cam A1]     [Cam A2]      ← Upper pair (~3m): angled down toward each half
+       \           /               Sees: ball landing, player position overhead
+        \         /
+    [Cam B1]     [Cam B2]      ← Lower pair (~2m): pointing along court length
+       →           ←               Sees: ball trajectory, net crossing, carry/spin
+            |
+        [STAND]
+        [SCREEN]               ← Virtual umpire display (see below)
+            |
+        [JETSON]               ← Edge compute at base of stand
+              ↓
+        BACK NET (Side B)
+```
+
+- **Upper pair (Cam A1 + A2):** Elevated, wide angle, angled downward toward each half of court. Primary for ball landing detection, player body position, overhead view of sand floor.
+- **Lower pair (Cam B1 + B2):** At net height, pointing along court length in each direction. Primary for ball trajectory, net crossing, spin tracking, carry detection.
+- **Stereo baseline:** Even 30-50cm separation between pairs is sufficient for 3D triangulation.
+- **Camera spec:** 4K 60fps, PoE, wide angle (120°+), IP65 dust/sandproof. e.g. Hikvision or Reolink 4K PoE ~$80-150 AUD each.
+
+### Virtual Umpire Display
+- Screen mounted on stand facing the court
+- Displays animated avatar that signals calls like a human ref:
+  - Arm raised = point awarded
+  - Arms crossed = fault
+  - Score displayed numerically below avatar
+- Audio: buzzer/whistle sound fires simultaneously with visual
+- Players look at the stand as they would a human ref — familiar UX, builds trust fast
+- Makes the system feel like a ref, not a computer
+
+### Processing
+- 1x NVIDIA Jetson Orin NX (16GB, ~$600) — handles all 4 camera streams comfortably
+- 1x local SSD (1-2TB) — 4K archive for review
+- 1x PoE switch (8-port, ~$80) — powers all 4 cameras + Jetson
+- 1x display (tablet or monitor, ~$150) — virtual umpire output
+- 1x speaker/buzzer (~$30)
 - Calibration markers on net posts (coloured tape/reflective dots)
 
-**Why 4 cameras:**
-- 3D ball triangulation — two cameras from different angles = real-world XYZ, eliminates perspective distortion entirely
-- No blind spots — ball always visible from at least 2 angles
-- Full player body tracking — 4 angles = accurate pose reconstruction, net touches trivially detected
-- Review from any angle — tablet shows best angle for disputed calls
+### Network & Power
+- All self-contained per court — single power feed to PoE switch
+- Jetson runs local WiFi hotspot — tablet connects directly, no venue internet needed
+- 8 courts optionally connected via venue LAN for central supervisor dashboard
+- Completely offline — no internet dependency, no cloud costs, no data leaving venue
+- Internet only for: software updates (scheduled off-hours, optional)
 
-**Cost estimate:** ~$1,200-1,600/court, ~$10K-13K for 8 courts
+**Cost per court:** ~$1,500-2,000 AUD
+**Total 8 courts:** ~$12K-16K AUD
 **Current ref cost:** ~$200,000/year
-**ROI:** Full system paid off in 3-4 weeks of operation
-**Year 2+ savings:** ~$180K-190K/year (net of maintenance)
-**Licensing potential:** Other venues, sports (netball, basketball) — significant IP value
+**Payback period:** 3-4 weeks of operation
+**Year 2+ savings:** ~$180K-190K/year
+**Licensing potential:** Other venues, other sports (netball, basketball) — significant IP value
 
 ---
 
